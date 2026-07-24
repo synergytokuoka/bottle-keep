@@ -16,6 +16,34 @@ pnpm lint          # eslint .
 
 There is no test suite configured in this project (no test script, no test framework installed).
 
+## デプロイ先
+
+https://synergytokuoka.github.io/bottle-keep/
+
+GitHub Pages（リポジトリ `bottle-keep`）でのホスティングを想定。静的サイトとして配信するため、実際にデプロイする際は `next.config.mjs` に `output: 'export'` と `basePath: '/bottle-keep'` の設定、および対応するビルド・デプロイ用の GitHub Actions ワークフローの追加が必要（現時点では未設定）。
+
+## 技術スタック
+
+- **フレームワーク**: Next.js 16（App Router）+ React 19 + TypeScript 5.7
+- **スタイリング**: Tailwind CSS v4（`@tailwindcss/postcss`）、`class-variance-authority` でバリアント管理、`clsx` + `tailwind-merge` を `lib/utils.ts` の `cn()` ヘルパーで合成
+- **UIコンポーネント**: shadcn/ui（style: `base-nova`、base color: `neutral`）を土台に、プリミティブは `@base-ui/react` を使用
+- **アイコン**: `lucide-react`
+- **フォント**: Google Fonts の `Noto Sans JP`（本文）/ `Shippori Mincho`（見出し・serif、居酒屋テイスト用）
+- **アナリティクス**: `@vercel/analytics`（本番環境でのみマウント）
+- **パッケージマネージャ**: pnpm（`pnpm-lock.yaml` / `pnpm-workspace.yaml`）
+- **データ永続化**: バックエンド／DBなし。ブラウザの `localStorage`（キー `bottle-keep:bottles`）のみで完結するクライアント専用構成
+- **テスト**: 未導入（テストフレームワーク・テストスクリプトなし）
+
+## コンポーネントの命名規約
+
+- **ファイル名**: kebab-case（例: `bottle-manager.tsx`, `register-form.tsx`, `search-bar.tsx`, `bottle-card.tsx`）
+- **コンポーネント（関数）名**: PascalCase で、ファイル名に対応させる（例: `bottle-manager.tsx` → `BottleManager`）
+- **Propsの型**: `<コンポーネント名>Props` という命名（例: `RegisterFormProps`）
+- **配置場所**:
+  - 機能固有のコンポーネントは `components/<機能名>/` 配下（例: `components/bottle-keep/`）
+  - 汎用・shadcn生成のUIプリミティブは `components/ui/` 配下
+- **`lib/` 配下**: ファイル名は kebab-case（例: `bottle-data.ts`）。型は PascalCase（例: `Bottle`）、定数は UPPER_SNAKE_CASE（例: `SHELF_ROWS`, `SHELF_COLS`, `INITIAL_BOTTLES`）、関数は camelCase（例: `shelfLabel`, `cn`）
+
 ## Git運用ルール
 
 - **コードに変更を加えたら、その都度コミットし、GitHubにプッシュする。** 変更を溜め込まず、1つの作業がまとまったタイミングでこまめにコミット→プッシュする。
