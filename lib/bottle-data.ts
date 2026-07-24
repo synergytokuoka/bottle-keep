@@ -2,6 +2,7 @@ export type Bottle = {
   id: string
   customerName: string
   bottleType: string
+  photo?: string // ボトル写真の data URL（任意）
   shelfRow: string // A〜D
   shelfCol: string // 1〜5
   registeredAt: string // YYYY-MM-DD

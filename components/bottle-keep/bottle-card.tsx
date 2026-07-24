@@ -18,14 +18,23 @@ export function BottleCard({ bottle, onDelete }: BottleCardProps) {
   return (
     <article className="group relative flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-primary/60 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate font-serif text-lg font-semibold text-card-foreground">
-            {bottle.customerName}
-            <span className="ml-1 text-sm font-normal text-muted-foreground">様</span>
-          </p>
-          <div className="mt-1.5 flex items-center gap-1.5 text-muted-foreground">
-            <Wine aria-hidden="true" className="size-4 shrink-0 text-accent" />
-            <span className="truncate text-sm">{bottle.bottleType}</span>
+        <div className="flex min-w-0 items-start gap-3">
+          {bottle.photo && (
+            <img
+              src={bottle.photo}
+              alt={`${bottle.bottleType}の写真`}
+              className="size-14 shrink-0 rounded-lg border border-border object-cover"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-serif text-lg font-semibold text-card-foreground">
+              {bottle.customerName}
+              <span className="ml-1 text-sm font-normal text-muted-foreground">様</span>
+            </p>
+            <div className="mt-1.5 flex items-center gap-1.5 text-muted-foreground">
+              <Wine aria-hidden="true" className="size-4 shrink-0 text-accent" />
+              <span className="truncate text-sm">{bottle.bottleType}</span>
+            </div>
           </div>
         </div>
 
