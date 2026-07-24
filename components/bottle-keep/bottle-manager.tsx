@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { PackageOpen, Wine } from 'lucide-react'
+import { PackageOpen, PlusCircle, Wine } from 'lucide-react'
 import { INITIAL_BOTTLES, shelfLabel, type Bottle } from '@/lib/bottle-data'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SearchBar } from './search-bar'
 import { RegisterForm } from './register-form'
 import { BottleCard } from './bottle-card'
@@ -67,14 +68,26 @@ export function BottleManager() {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[360px_1fr]">
-      {/* 左：登録フォーム */}
-      <div className="lg:sticky lg:top-8 lg:self-start">
-        <RegisterForm onAdd={handleAdd} />
-      </div>
+    <Tabs defaultValue="register">
+      <TabsList>
+        <TabsTrigger value="register">
+          <PlusCircle aria-hidden="true" className="size-4" />
+          新しいボトルを登録
+        </TabsTrigger>
+        <TabsTrigger value="list">
+          <Wine aria-hidden="true" className="size-4" />
+          キープ中のボトル
+          <span className="text-xs opacity-80">({bottles.length})</span>
+        </TabsTrigger>
+      </TabsList>
 
-      {/* 右：検索 + 一覧 */}
-      <div className="flex flex-col gap-6">
+      <TabsContent value="register">
+        <div className="mx-auto max-w-md">
+          <RegisterForm onAdd={handleAdd} />
+        </div>
+      </TabsContent>
+
+      <TabsContent value="list" className="flex flex-col gap-6">
         <SearchBar value={query} onChange={setQuery} resultCount={filtered.length} />
 
         <div className="flex items-center justify-between">
@@ -102,7 +115,7 @@ export function BottleManager() {
             </p>
           </div>
         )}
-      </div>
-    </div>
+      </TabsContent>
+    </Tabs>
   )
 }
