@@ -2,43 +2,29 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { PackageOpen, PlusCircle, Wine } from 'lucide-react'
-import { INITIAL_BOTTLES, shelfLabel, type Bottle } from '@/lib/bottle-data'
+import { shelfLabel, type Bottle } from '@/lib/bottle-data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useAuth } from '@/components/auth/auth-provider'
+import { deleteBottle, fetchBottles, insertBottle } from '@/lib/supabase/bottles'
 import { SearchBar } from './search-bar'
 import { RegisterForm } from './register-form'
 import { BottleCard } from './bottle-card'
 
-const STORAGE_KEY = 'bottle-keep:bottles'
-
-const today = () => {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-
 export function BottleManager() {
-  const [bottles, setBottles] = useState<Bottle[]>(INITIAL_BOTTLES)
+  const { user } = useAuth()
+  const [bottles, setBottles] = useState<Bottle[]>([])
   const [query, setQuery] = useState('')
-  const [isLoaded, setIsLoaded] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
-  // 初回マウント時に保存済みデータを読み込む(SSRとのハイドレーション不整合を避けるため useEffect で実行)
   useEffect(() => {
-    try {
-      const stored = window.localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        setBottles(JSON.parse(stored))
-      }
-    } catch {
-      // 破損データは無視して初期値のまま
-    }
-    setIsLoaded(true)
-  }, [])
-
-  // 読み込み完了後、変更のたびに保存する(読み込み前に初期値で上書きしないよう isLoaded を待つ)
-  useEffect(() => {
-    if (!isLoaded) return
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(bottles))
-  }, [bottles, isLoaded])
+    if (!user) return
+    setIsLoading(true)
+    fetchBottles()
+      .then(setBottles)
+      .catch((err) => setLoadError(err instanceof Error ? err.message : 'ボトルの取得に失敗しました'))
+      .finally(() => setIsLoading(false))
+  }, [user])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -56,15 +42,20 @@ export function BottleManager() {
     })
   }, [bottles, query])
 
-  const handleAdd = (data: Omit<Bottle, 'id' | 'registeredAt'>) => {
-    setBottles((prev) => [
-      { ...data, id: crypto.randomUUID(), registeredAt: today() },
-      ...prev,
-    ])
+  const handleAdd = async (data: Omit<Bottle, 'id' | 'registeredAt'>) => {
+    if (!user) return
+    const created = await insertBottle(data, user.id)
+    setBottles((prev) => [created, ...prev])
   }
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
+    const previous = bottles
     setBottles((prev) => prev.filter((b) => b.id !== id))
+    try {
+      await deleteBottle(id)
+    } catch {
+      setBottles(previous)
+    }
   }
 
   return (
@@ -100,7 +91,11 @@ export function BottleManager() {
           </span>
         </div>
 
-        {filtered.length > 0 ? (
+        {loadError && <p className="text-sm text-destructive">{loadError}</p>}
+
+        {isLoading ? (
+          <p className="py-16 text-center text-sm text-muted-foreground">読み込み中...</p>
+        ) : filtered.length > 0 ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {filtered.map((bottle) => (
               <BottleCard key={bottle.id} bottle={bottle} onDelete={handleDelete} />

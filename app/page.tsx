@@ -1,5 +1,7 @@
 import { Wine } from 'lucide-react'
 import { BottleManager } from '@/components/bottle-keep/bottle-manager'
+import { RequireAuth } from '@/components/auth/require-auth'
+import { AccountMenu } from '@/components/auth/account-menu'
 
 export default function Page() {
   return (
@@ -16,11 +18,16 @@ export default function Page() {
               ボトルキープ管理
             </h1>
           </div>
+          <div className="ml-auto">
+            <AccountMenu />
+          </div>
         </div>
       </header>
 
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-        <BottleManager />
+        <RequireAuth>
+          <BottleManager />
+        </RequireAuth>
       </div>
 
       <footer className="border-t border-border/60 py-6 text-center">

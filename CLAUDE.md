@@ -16,6 +16,21 @@ pnpm lint          # eslint .
 
 There is no test suite configured in this project (no test script, no test framework installed).
 
+### 環境変数
+
+`.env`（gitignore 済み、リポジトリには含めない）に以下を設定する。値は `.env.example` を参照。
+
+```
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+```
+
+本番（GitHub Pages）ビルドでは、GitHub Actions の Secrets（`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`）から `.github/workflows/deploy.yml` のビルドステップに渡している。
+
+### Supabase スキーマ変更
+
+`supabase/migrations/` に SQL を追記し、**Supabase ダッシュボードの SQL Editor で手動実行**する。このプロジェクトは anon/publishable key しか保持しておらず、DDL（テーブル作成等）を実行できる service_role key や Management API トークンがないため、Claude Code からスキーマ変更を直接適用することはできない。
+
 ## デプロイ先
 
 https://synergytokuoka.github.io/bottle-keep/
@@ -31,7 +46,7 @@ GitHub Pages（リポジトリ `bottle-keep`）でのホスティングを想定
 - **フォント**: Google Fonts の `Noto Sans JP`（本文）/ `Shippori Mincho`（見出し・serif、居酒屋テイスト用）
 - **アナリティクス**: `@vercel/analytics`（本番環境でのみマウント）
 - **パッケージマネージャ**: pnpm（`pnpm-lock.yaml` / `pnpm-workspace.yaml`）
-- **データ永続化**: バックエンド／DBなし。ブラウザの `localStorage`（キー `bottle-keep:bottles`）のみで完結するクライアント専用構成
+- **認証・データ永続化**: Supabase（`@supabase/supabase-js`）。Auth（メール・パスワード）でログイン必須にし、ボトルデータは Postgres の `bottles` テーブルに user_id 単位で RLS 保護して保存（`supabase/migrations/`）
 - **テスト**: 未導入（テストフレームワーク・テストスクリプトなし）
 
 ## コンポーネントの命名規約
@@ -42,7 +57,7 @@ GitHub Pages（リポジトリ `bottle-keep`）でのホスティングを想定
 - **配置場所**:
   - 機能固有のコンポーネントは `components/<機能名>/` 配下（例: `components/bottle-keep/`）
   - 汎用・shadcn生成のUIプリミティブは `components/ui/` 配下
-- **`lib/` 配下**: ファイル名は kebab-case（例: `bottle-data.ts`）。型は PascalCase（例: `Bottle`）、定数は UPPER_SNAKE_CASE（例: `SHELF_ROWS`, `SHELF_COLS`, `INITIAL_BOTTLES`）、関数は camelCase（例: `shelfLabel`, `cn`）
+- **`lib/` 配下**: ファイル名は kebab-case（例: `bottle-data.ts`, `supabase/client.ts`）。型は PascalCase（例: `Bottle`）、定数は UPPER_SNAKE_CASE（例: `SHELF_ROWS`, `SHELF_COLS`）、関数は camelCase（例: `shelfLabel`, `cn`, `fetchBottles`）
 
 ## Git運用ルール
 
@@ -53,15 +68,22 @@ GitHub Pages（リポジトリ `bottle-keep`）でのホスティングを想定
 
 ## Architecture
 
-This is a **client-only** Next.js (App Router, Next 16 / React 19) single-page app — there is no backend, API route, or database. All state lives in the browser.
+This is a Next.js (App Router, Next 16 / React 19) app statically exported (`output: 'export'`) for GitHub Pages — there is no Next.js server/API route at runtime, so all auth and data access happens client-side directly against Supabase (Auth + Postgres via `@supabase/supabase-js`).
 
-- `app/page.tsx` — page shell (header/footer chrome) that renders `BottleManager`.
-- `app/layout.tsx` — root layout; loads two Google fonts used for the izakaya theme (`Noto_Sans_JP` for body text, `Shippori_Mincho` for serif/heading text, exposed as CSS vars `--font-noto-sans-jp` / `--font-shippori-mincho`), and conditionally mounts `@vercel/analytics` only in production.
-- `lib/bottle-data.ts` — the domain model: the `Bottle` type, shelf position constants (`SHELF_ROWS` A–D × `SHELF_COLS` 1–5), the `shelfLabel` helper, and `INITIAL_BOTTLES` seed data used as the fallback/default dataset.
-- `components/bottle-keep/bottle-manager.tsx` — the single stateful component that owns the `bottles` array and search `query`. It filters bottles for `SearchBar`, hands an `onAdd` callback to `RegisterForm`, and renders the list via `BottleCard`. **Persistence:** on mount it loads saved bottles from `localStorage` (key `bottle-keep:bottles`) via `useEffect` (kept separate from the `useState` initializer to avoid an SSR/client hydration mismatch — the first client render must match the server-rendered `INITIAL_BOTTLES`), then a second `useEffect` writes to `localStorage` on every change, gated by an `isLoaded` flag so the initial load doesn't get clobbered before it completes.
-- `components/bottle-keep/register-form.tsx`, `search-bar.tsx`, `bottle-card.tsx` — presentational children driven entirely by props/callbacks from `BottleManager`; they hold no persisted state of their own.
-- `components/ui/` — shadcn-generated primitives (currently just `button.tsx`), built on `@base-ui/react` primitives + `class-variance-authority` for variants, styled with Tailwind.
+- `app/page.tsx` — page shell (header/footer chrome) that renders `AccountMenu` and wraps `BottleManager` in `RequireAuth`.
+- `app/login/page.tsx`, `app/signup/page.tsx` — standalone client-rendered auth pages (simple email/password forms) calling `supabase.auth.signInWithPassword` / `supabase.auth.signUp` directly; both redirect to `/` if a session already exists, and `/signup` shows a "check your email" screen when Supabase requires email confirmation (i.e. `signUp` doesn't return a session immediately).
+- `app/layout.tsx` — root layout; wraps `children` in `AuthProvider`; loads two Google fonts used for the izakaya theme (`Noto_Sans_JP` for body text, `Shippori_Mincho` for serif/heading text, exposed as CSS vars `--font-noto-sans-jp` / `--font-shippori-mincho`), and conditionally mounts `@vercel/analytics` only in production.
+- `components/auth/auth-provider.tsx` — `AuthProvider` + `useAuth()` context exposing `{ user, session, isLoading, signOut }`, backed by `supabase.auth.getSession()` + `onAuthStateChange`.
+- `components/auth/require-auth.tsx` — client-side route guard; while `isLoading` or with no `session` it shows a loading state and redirects to `/login` via `useRouter().replace` (no server middleware is possible under static export, so there's an unavoidable brief flash before redirect).
+- `components/auth/account-menu.tsx` — header widget showing the logged-in user's email and a sign-out button.
+- `lib/supabase/client.ts` — the browser Supabase client singleton, built from `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+- `lib/supabase/bottles.ts` — the only data-access layer for the `bottles` table: `fetchBottles` / `insertBottle` / `deleteBottle`, plus the snake_case (DB row) ↔ camelCase (`Bottle`) mapper. RLS on the `bottles` table restricts rows to `auth.uid() = user_id`, so `fetchBottles` never filters by user explicitly.
+- `supabase/migrations/*.sql` — schema history; **must be run manually** in the Supabase SQL Editor (see Commands section above — no DDL-capable credentials are available to Claude Code in this repo).
+- `lib/bottle-data.ts` — the domain model: the `Bottle` type, shelf position constants (`SHELF_ROWS` A–D × `SHELF_COLS` 1–5), and the `shelfLabel` helper.
+- `components/bottle-keep/bottle-manager.tsx` — the stateful component that fetches the current user's bottles from Supabase on mount (via `useAuth()` for `user.id`) and owns the `bottles` array and search `query` in memory. It filters bottles for `SearchBar`, hands an async `onAdd` callback (calls `insertBottle` then prepends the returned row) to `RegisterForm`, and renders the list via `BottleCard`; `onDelete` optimistically removes the row locally and rolls back on failure.
+- `components/bottle-keep/register-form.tsx`, `search-bar.tsx`, `bottle-card.tsx` — presentational children driven entirely by props/callbacks from `BottleManager`; they hold no persisted state of their own. `register-form.tsx` awaits the (now async, network-backed) `onAdd` and shows a submitting/error state around it.
+- `components/ui/` — shadcn-generated primitives (`button.tsx`, `tabs.tsx`), built on `@base-ui/react` primitives + `class-variance-authority` for variants, styled with Tailwind.
 
 Path alias: `@/*` maps to the repo root (see `tsconfig.json`), matching the shadcn `aliases` config in `components.json` (style `base-nova`, base color `neutral`, Tailwind CSS v4 with `cssVariables: true`, icon library `lucide`).
 
-`next.config.mjs` sets `typescript.ignoreBuildErrors: true` and `images.unoptimized: true`.
+`next.config.mjs` sets `output: 'export'`, `typescript.ignoreBuildErrors: true`, `images.unoptimized: true`, and conditionally sets `basePath`/`assetPrefix` to `/bottle-keep` only when `GITHUB_ACTIONS === 'true'` (so local dev/build stays at the site root).

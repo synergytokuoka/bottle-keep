@@ -5,7 +5,7 @@ import { CheckCircle2, ImagePlus, PlusCircle, X } from 'lucide-react'
 import { SHELF_COLS, SHELF_ROWS, type Bottle } from '@/lib/bottle-data'
 
 type RegisterFormProps = {
-  onAdd: (bottle: Omit<Bottle, 'id' | 'registeredAt'>) => void
+  onAdd: (bottle: Omit<Bottle, 'id' | 'registeredAt'>) => Promise<void>
 }
 
 const fieldClass =
@@ -46,6 +46,8 @@ export function RegisterForm({ onAdd }: RegisterFormProps) {
   const [shelfCol, setShelfCol] = useState<string>('1')
   const [remainingNote, setRemainingNote] = useState('')
   const [done, setDone] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -60,28 +62,36 @@ export function RegisterForm({ onAdd }: RegisterFormProps) {
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!customerName.trim() || !bottleType.trim()) return
 
-    onAdd({
-      customerName: customerName.trim(),
-      bottleType: bottleType.trim(),
-      photo,
-      shelfRow,
-      shelfCol,
-      remainingNote: remainingNote.trim() || '満タン',
-    })
+    setError('')
+    setIsSubmitting(true)
+    try {
+      await onAdd({
+        customerName: customerName.trim(),
+        bottleType: bottleType.trim(),
+        photo,
+        shelfRow,
+        shelfCol,
+        remainingNote: remainingNote.trim() || '満タン',
+      })
 
-    setCustomerName('')
-    setBottleType('')
-    setPhoto(undefined)
-    if (fileInputRef.current) fileInputRef.current.value = ''
-    setShelfRow('A')
-    setShelfCol('1')
-    setRemainingNote('')
-    setDone(true)
-    setTimeout(() => setDone(false), 2500)
+      setCustomerName('')
+      setBottleType('')
+      setPhoto(undefined)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      setShelfRow('A')
+      setShelfCol('1')
+      setRemainingNote('')
+      setDone(true)
+      setTimeout(() => setDone(false), 2500)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '登録に失敗しました')
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -226,9 +236,12 @@ export function RegisterForm({ onAdd }: RegisterFormProps) {
           />
         </div>
 
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
         <button
           type="submit"
-          className="mt-2 flex h-12 items-center justify-center gap-2 rounded-lg bg-primary font-medium text-primary-foreground transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-[0.99]"
+          disabled={isSubmitting}
+          className="mt-2 flex h-12 items-center justify-center gap-2 rounded-lg bg-primary font-medium text-primary-foreground transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/50 active:scale-[0.99] disabled:opacity-60"
         >
           {done ? (
             <>
@@ -238,7 +251,7 @@ export function RegisterForm({ onAdd }: RegisterFormProps) {
           ) : (
             <>
               <PlusCircle className="size-5" />
-              ボトルを登録する
+              {isSubmitting ? '登録中...' : 'ボトルを登録する'}
             </>
           )}
         </button>
