@@ -1,10 +1,13 @@
 'use client'
 
-import { CalendarDays, Trash2, Wine } from 'lucide-react'
+import { useState } from 'react'
+import { CalendarDays, Pencil, Trash2, Wine } from 'lucide-react'
 import { shelfLabel, type Bottle } from '@/lib/bottle-data'
+import { EditBottleDialog } from './edit-bottle-dialog'
 
 type BottleCardProps = {
   bottle: Bottle
+  onUpdate: (id: string, data: Omit<Bottle, 'id' | 'registeredAt'>) => Promise<void>
   onDelete: (id: string) => void
 }
 
@@ -14,7 +17,10 @@ const formatDate = (iso: string) => {
   return `${y}年${Number(m)}月${Number(d)}日`
 }
 
-export function BottleCard({ bottle, onDelete }: BottleCardProps) {
+export function BottleCard({ bottle, onUpdate, onDelete }: BottleCardProps) {
+  // 編集ダイアログの開閉はカード自身で管理する
+  const [isEditOpen, setIsEditOpen] = useState(false)
+
   return (
     <article className="group relative flex flex-col gap-4 rounded-2xl border border-border bg-card p-5 shadow-sm transition hover:border-primary/60 hover:shadow-md">
       <div className="flex items-start justify-between gap-3">
@@ -54,15 +60,32 @@ export function BottleCard({ bottle, onDelete }: BottleCardProps) {
           <CalendarDays aria-hidden="true" className="size-3.5" />
           <span>登録日：{formatDate(bottle.registeredAt)}</span>
         </div>
-        <button
-          type="button"
-          onClick={() => onDelete(bottle.id)}
-          aria-label={`${bottle.customerName}様のボトルを削除`}
-          className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
-        >
-          <Trash2 className="size-4" />
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setIsEditOpen(true)}
+            aria-label={`${bottle.customerName}様のボトルを編集`}
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <Pencil className="size-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(bottle.id)}
+            aria-label={`${bottle.customerName}様のボトルを削除`}
+            className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive"
+          >
+            <Trash2 className="size-4" />
+          </button>
+        </div>
       </div>
+
+      <EditBottleDialog
+        bottle={bottle}
+        open={isEditOpen}
+        onOpenChange={setIsEditOpen}
+        onSave={onUpdate}
+      />
     </article>
   )
 }
