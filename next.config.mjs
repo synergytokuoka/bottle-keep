@@ -5,7 +5,7 @@ const isGithubPagesBuild = process.env.GITHUB_ACTIONS === 'true'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'export',
+  output: isGithubPagesBuild ? 'export' : undefined,
   basePath: isGithubPagesBuild ? `/${repoName}` : '',
   assetPrefix: isGithubPagesBuild ? `/${repoName}/` : '',
   typescript: {
